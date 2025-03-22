@@ -4,7 +4,7 @@ import io
 import os
 from PIL import Image
 from datetime import datetime
-from openai import OpenAI
+from openai import OpenAI  # Updated import
 
 # Set page configuration
 st.set_page_config(
@@ -50,30 +50,20 @@ st.markdown("""
 st.markdown('<p class="title-text">✨ Colorful Mandala Generator ✨</p>', unsafe_allow_html=True)
 st.markdown('<p class="subtitle-text">Enter a word and get a beautiful, unique mandala inspired by it</p>', unsafe_allow_html=True)
 
-# Function to get OpenAI API key
-def get_api_key():
-    # First check environment variables
-    api_key = os.environ.get("OPENAI_API_KEY", "")
-    
-    # If not found, check Streamlit secrets
-    if not api_key:
-        if "OPENAI_API_KEY" in st.secrets:
-            api_key = st.secrets["OPENAI_API_KEY"]
-    
-    return api_key
-
 # Function to generate mandala using DALL-E 3
 def generate_mandala(prompt_word):
-    # Get API key
-    api_key = get_api_key()
-    
     # Check if API key is available
+    api_key = os.environ.get("OPENAI_API_KEY", "")
+    
+    # If not in environment variables, check Streamlit secrets
+    if not api_key and "OPENAI_API_KEY" in st.secrets:
+        api_key = st.secrets["OPENAI_API_KEY"]
+    
     if not api_key:
-        st.error("OpenAI API key not found. Please set it in your Streamlit secrets.")
-        st.info("Go to Streamlit Cloud dashboard, click on Settings for this app, and add your API key to the Secrets section.")
+        st.error("OpenAI API key not found. Please set it in your environment variables or Streamlit secrets.")
         return None
     
-    # Initialize OpenAI client with the API key
+    # Initialize OpenAI client with the API key (updated for modern OpenAI SDK)
     client = OpenAI(api_key=api_key)
     
     # Create detailed prompt for the mandala
@@ -108,7 +98,6 @@ def generate_mandala(prompt_word):
             
     except Exception as e:
         st.error(f"Error generating mandala: {str(e)}")
-        st.info("Please check your OpenAI API key and make sure it has access to DALL-E 3.")
         return None
 
 # Function to create a download link for the image
@@ -123,16 +112,6 @@ def get_image_download_link(img, filename, text):
 
 # Main app functionality
 def main():
-    # Debug info for troubleshooting
-    if st.checkbox("Show API Key Status (for troubleshooting)"):
-        api_key = get_api_key()
-        if api_key:
-            masked_key = api_key[:8] + "*" * (len(api_key) - 12) + api_key[-4:]
-            st.info(f"API Key detected (masked): {masked_key}")
-            st.success("API key is present. If you're still having issues, check if this key is valid in your OpenAI account.")
-        else:
-            st.error("No API key detected. Please add your OpenAI API key to the Streamlit secrets.")
-    
     # Input for the inspiration word
     inspiration_word = st.text_input("Enter a word for inspiration:", placeholder="e.g., ocean, fire, forest, love...")
     
