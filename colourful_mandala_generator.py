@@ -1,10 +1,9 @@
 import streamlit as st
 import requests
 import io
-import os
 from PIL import Image
 from datetime import datetime
-from openai import OpenAI  # Updated import
+from openai import OpenAI
 
 # Set page configuration
 st.set_page_config(
@@ -51,19 +50,13 @@ st.markdown('<p class="title-text">✨ Colorful Mandala Generator ✨</p>', unsa
 st.markdown('<p class="subtitle-text">Enter a word and get a beautiful, unique mandala inspired by it</p>', unsafe_allow_html=True)
 
 # Function to generate mandala using DALL-E 3
-def generate_mandala(prompt_word):
-    # Check if API key is available
-    api_key = os.environ.get("OPENAI_API_KEY", "")
-    
-    # If not in environment variables, check Streamlit secrets
-    if not api_key and "OPENAI_API_KEY" in st.secrets:
-        api_key = st.secrets["OPENAI_API_KEY"]
-    
+def generate_mandala(prompt_word, api_key):
+    # Check if API key was provided
     if not api_key:
-        st.error("OpenAI API key not found. Please set it in your environment variables or Streamlit secrets.")
+        st.error("Please enter your OpenAI API key to generate mandalas.")
         return None
     
-    # Initialize OpenAI client with the API key (updated for modern OpenAI SDK)
+    # Initialize OpenAI client with the provided API key
     client = OpenAI(api_key=api_key)
     
     # Create detailed prompt for the mandala
@@ -98,6 +91,7 @@ def generate_mandala(prompt_word):
             
     except Exception as e:
         st.error(f"Error generating mandala: {str(e)}")
+        st.info("Make sure your API key is valid and has access to DALL-E 3.")
         return None
 
 # Function to create a download link for the image
@@ -112,6 +106,22 @@ def get_image_download_link(img, filename, text):
 
 # Main app functionality
 def main():
+    # Create a sidebar for API key input
+    with st.sidebar:
+        st.header("OpenAI API Key")
+        st.markdown("⚠️ Your API key is required to generate mandalas")
+        api_key = st.text_input("Enter your OpenAI API key:", type="password", help="Get an API key from https://platform.openai.com/api-keys")
+        st.markdown("Your API key is not stored anywhere and is only used for this session")
+        
+        # Add API key instructions
+        st.markdown("### How to get an API key")
+        st.markdown("""
+        1. Go to [OpenAI API Keys](https://platform.openai.com/api-keys)
+        2. Sign in or create an account
+        3. Click "Create new secret key"
+        4. Copy the key and paste it above
+        """)
+    
     # Input for the inspiration word
     inspiration_word = st.text_input("Enter a word for inspiration:", placeholder="e.g., ocean, fire, forest, love...")
     
@@ -127,7 +137,7 @@ def main():
     # Generate mandala when button is clicked
     if generate_button and inspiration_word:
         with st.spinner("Creating your mandala... This might take up to 30 seconds"):
-            mandala_image = generate_mandala(inspiration_word)
+            mandala_image = generate_mandala(inspiration_word, api_key)
             if mandala_image:
                 st.session_state.generated_image = mandala_image
                 st.session_state.inspiration_word = inspiration_word
