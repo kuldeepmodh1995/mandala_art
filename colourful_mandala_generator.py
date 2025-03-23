@@ -1,19 +1,15 @@
 import streamlit as st
 import requests
 import io
-import os
-import json
 import base64
 from PIL import Image
-from datetime import datetime
 from openai import OpenAI
-import google.generativeai as genai
-import re
+import os
 
-# Set page configuration
+# Set page config
 st.set_page_config(
-    page_title="Colorful Mandala Generator",
-    page_icon="🎨",
+    page_title="Mandala Art Generator",
+    page_icon="🔮",
     layout="centered"
 )
 
@@ -21,106 +17,57 @@ st.set_page_config(
 st.markdown("""
 <style>
     .main {
-        background-color: #f5f7ff;
+        background-color: #f5f5f5;
     }
-    .title-text {
-        font-size: 42px;
-        font-weight: bold;
-        color: #6c5ce7;
-        text-align: center;
-        margin-bottom: 20px;
+    .stApp {
+        max-width: 900px;
+        margin: 0 auto;
     }
-    .subtitle-text {
-        font-size: 20px;
-        color: #4834d4;
-        text-align: center;
-        margin-bottom: 30px;
+    h1, h2, h3 {
+        color: #3a0ca3;
     }
-    .stButton>button {
-        background-color: #6c5ce7;
+    .stButton button {
+        background-color: #7209b7;
         color: white;
-        font-weight: bold;
         border-radius: 10px;
-        padding: 10px 20px;
-        width: 100%;
-    }
-    .stButton>button:hover {
-        background-color: #4834d4;
-    }
-    .color-theme {
-        display: inline-block;
-        width: 30px;
-        height: 30px;
-        border-radius: 50%;
-        margin-right: 10px;
-        cursor: pointer;
-        border: 2px solid transparent;
-    }
-    .color-theme:hover {
-        transform: scale(1.2);
-        transition: transform 0.3s ease;
     }
     .download-btn {
-        display: inline-block;
-        background-color: #6c5ce7;
+        background-color: #4cc9f0;
         color: white;
-        padding: 8px 16px;
+        padding: 10px 20px;
+        border-radius: 10px;
         text-decoration: none;
-        border-radius: 8px;
-        margin: 5px;
-        text-align: center;
-        transition: all 0.3s ease;
-    }
-    .download-btn:hover {
-        background-color: #4834d4;
-        transform: translateY(-2px);
+        display: inline-block;
+        margin-top: 10px;
     }
 </style>
 """, unsafe_allow_html=True)
 
-# App title and description
-st.markdown('<p class="title-text">✨ Colorful Mandala Generator ✨</p>', unsafe_allow_html=True)
-st.markdown('<p class="subtitle-text">Enter a word and get a beautiful, unique mandala inspired by it</p>', unsafe_allow_html=True)
-
-# Function to detect API key type
-def detect_api_key_type(api_key):
-    # Check for OpenAI key pattern (sk-...)
-    if api_key.startswith("sk-"):
-        return "openai"
+def generate_mandala(api_key, inspiration, color_theme):
+    """Generate mandala using OpenAI's DALL-E 3"""
+    client = OpenAI(api_key=api_key)
     
-    # Check for Google API key pattern (typically longer alphanumeric strings)
-    if re.match(r'^AIza[0-9A-Za-z_-]{35}$', api_key):
-        return "google"
+    # Map color theme selections to detailed prompts
+    color_theme_prompts = {
+        "Warm Sunset": "warm sunset colors of orange, red, and golden yellow",
+        "Ocean Blues": "ocean-inspired blues, teals, and aquamarine",
+        "Forest Greens": "forest greens, earthy browns, and moss colors",
+        "Purple Dream": "dreamy purples, lavenders, and soft pinks",
+        "Rainbow": "vibrant rainbow colors across the entire spectrum"
+    }
     
-    # Check for Anthropic/Claude API key pattern (sk-ant-...)
-    if api_key.startswith("sk-ant-"):
-        return "anthropic"
+    theme_description = color_theme_prompts.get(color_theme, "vibrant colorful")
     
-    # Default to OpenAI if we can't determine
-    return "unknown"
-
-# Generate mandala using OpenAI DALL-E
-def generate_with_openai(prompt, api_key, color_theme=None):
+    prompt = f"""Create a detailed, symmetrical mandala inspired by the word '{inspiration}'. 
+    Use {theme_description} colors to create a harmonious design.
+    The mandala should be perfectly centered with intricate, balanced patterns.
+    Create in the style of high-quality digital art with clear details and smooth lines.
+    The background should be solid white to make the mandala stand out."""
+    
     try:
-        client = OpenAI(api_key=api_key)
-        
-        # Add color theme to prompt if specified
-        if color_theme:
-            detailed_prompt = f"""Create a vibrant, colorful symmetrical mandala inspired by the word '{prompt}' using primarily {color_theme} color palette. 
-            The mandala should have intricate patterns, radial symmetry, and be highly detailed.
-            Make it ornate with a harmonious {color_theme} color scheme. The background should complement the mandala.
-            The style should be highly detailed and decorative, like traditional spiritual mandalas.
-            Render in high resolution with clear details."""
-        else:
-            detailed_prompt = f"""Create a vibrant, colorful symmetrical mandala inspired by the word '{prompt}'. 
-            The mandala should have intricate patterns, radial symmetry, and use colors that evoke the essence of '{prompt}'.
-            Make it detailed and ornate with a harmonious color palette. The background should complement the mandala.
-            The style should be highly detailed and decorative, like traditional spiritual mandalas but with contemporary colors.
-            Render in high resolution with clear details."""
-        
         response = client.images.generate(
             model="dall-e-3",
-            prompt=detailed_prompt,
+            prompt=prompt,
             size="1024x1024",
             quality="standard",
             n=1,
@@ -129,200 +76,91 @@ def generate_with_openai(prompt, api_key, color_theme=None):
         # Get image URL
         image_url = response.data[0].url
         
-        # Download image
+        # Download the image
         image_response = requests.get(image_url)
-        if image_response.status_code == 200:
-            return Image.open(io.BytesIO(image_response.content))
-        else:
-            st.error(f"Failed to download image: {image_response.status_code}")
-            return None
+        image = Image.open(io.BytesIO(image_response.content))
+        return image, None
     
     except Exception as e:
-        st.error(f"Error with OpenAI: {str(e)}")
-        return None
+        return None, str(e)
 
-# Generate mandala using Google Gemini
-def generate_with_gemini(prompt, api_key, color_theme=None):
-    try:
-        genai.configure(api_key=api_key)
-        
-        # Add color theme to prompt if specified
-        if color_theme:
-            detailed_prompt = f"""Create a vibrant, symmetrical mandala inspired by the word '{prompt}' using primarily {color_theme} color palette. 
-            The mandala should have intricate patterns, radial symmetry, and be highly detailed.
-            Make it ornate with a harmonious {color_theme} color scheme. The background should complement the mandala.
-            The style should be highly detailed and decorative, like traditional spiritual mandalas.
-            Generate as a high-resolution image."""
-        else:
-            detailed_prompt = f"""Create a vibrant, colorful symmetrical mandala inspired by the word '{prompt}'. 
-            The mandala should have intricate patterns, radial symmetry, and use colors that evoke the essence of '{prompt}'.
-            Make it detailed and ornate with a harmonious color palette. The background should complement the mandala.
-            The style should be highly detailed and decorative, like traditional spiritual mandalas but with contemporary colors.
-            Generate as a high-resolution image."""
-        
-        model = genai.GenerativeModel('gemini-pro-vision')
-        response = model.generate_content(detailed_prompt)
-        
-        # Extract image from response
-        image_data = response.parts[0].image_data
-        image = Image.open(io.BytesIO(base64.b64decode(image_data)))
-        return image
-        
-    except Exception as e:
-        st.error(f"Error with Google Gemini: {str(e)}")
-        return None
-
-# Function for Anthropic/Claude API (placeholder - not fully implemented as Claude doesn't have direct image generation yet)
-def generate_with_anthropic(prompt, api_key, color_theme=None):
-    st.warning("Anthropic/Claude direct image generation is not fully supported yet. Redirecting to OpenAI...")
-    return generate_with_openai(prompt, api_key, color_theme)
-
-# Main mandala generation function that routes to the correct API
-def generate_mandala(prompt_word, api_key, color_theme=None):
-    # Detect API key type
-    api_type = detect_api_key_type(api_key)
-    
-    st.info(f"🎨 Generating your beautiful mandala using {api_type.upper()} API... Please wait a moment.")
-    
-    # Route to the correct API based on the detected type
-    if api_type == "openai":
-        return generate_with_openai(prompt_word, api_key, color_theme)
-    elif api_type == "google":
-        return generate_with_gemini(prompt_word, api_key, color_theme)
-    elif api_type == "anthropic":
-        return generate_with_anthropic(prompt_word, api_key, color_theme)
-    else:
-        st.warning("Unknown API key type. Attempting with OpenAI...")
-        return generate_with_openai(prompt_word, api_key, color_theme)
-
-# Function to create a download link for the image
-def get_image_download_link(img, filename, text, format="PNG"):
+def get_image_download_link(img, filename="mandala.png", text="Download Mandala"):
+    """Generate a download link for the image"""
     buffered = io.BytesIO()
-    if format.upper() == "JPG" or format.upper() == "JPEG":
-        img.save(buffered, format="JPEG", quality=95)
-        mime = "image/jpeg"
-        ext = "jpg"
-    else:
-        img.save(buffered, format="PNG")
-        mime = "image/png"
-        ext = "png"
-    
+    img.save(buffered, format="PNG")
     img_str = base64.b64encode(buffered.getvalue()).decode()
-    href = f'<a href="data:{mime};base64,{img_str}" download="{filename}.{ext}" class="download-btn">{text}</a>'
+    href = f'<a href="data:image/png;base64,{img_str}" download="{filename}" class="download-btn">{text}</a>'
     return href
 
-# Main app functionality
-def main():
-    # API Key input with password field
-    api_key = st.text_input("Enter your API Key (OpenAI, Google Gemini, or Anthropic):", type="password", 
-                           help="Your API key will be used only for this session and won't be stored.")
+# App title and description
+st.title("✨ Magical Mandala Generator ✨")
+st.markdown("Create beautiful, unique mandala art inspired by your ideas")
+
+# API key input
+api_key = st.text_input("Enter your OpenAI API Key", type="password", help="Your API key will not be stored")
+
+# Sidebar for options
+with st.sidebar:
+    st.header("Mandala Options")
     
-    # Check if API key is in Streamlit secrets if not provided
-    if not api_key and "API_KEY" in st.secrets:
-        api_key = st.secrets["API_KEY"]
-    
-    # Input for the inspiration word
-    inspiration_word = st.text_input("Enter a word for inspiration:", placeholder="e.g., ocean, fire, forest, love...")
+    # Inspiration word
+    inspiration_word = st.text_input("Inspiration Word", 
+                                     placeholder="Enter a word or concept...",
+                                     help="This word will inspire your mandala's design")
     
     # Color theme selection
-    st.write("Choose a color theme (optional):")
-    col1, col2, col3, col4, col5 = st.columns(5)
+    color_themes = ["Warm Sunset", "Ocean Blues", "Forest Greens", "Purple Dream", "Rainbow"]
+    selected_theme = st.selectbox("Color Theme", color_themes, 
+                                 help="Choose the color palette for your mandala")
     
-    with col1:
-        blue_theme = st.button("🔵 Blue")
-    with col2:
-        green_theme = st.button("🟢 Green")
-    with col3:
-        red_theme = st.button("🔴 Red")
-    with col4:
-        purple_theme = st.button("🟣 Purple")
-    with col5:
-        custom_theme = st.button("🎨 Random")
-    
-    # Set color theme based on button clicks
-    color_theme = None
-    if blue_theme:
-        color_theme = "blue"
-    elif green_theme:
-        color_theme = "green"
-    elif red_theme:
-        color_theme = "red"
-    elif purple_theme:
-        color_theme = "purple"
-    elif custom_theme:
-        color_theme = "vibrant"
-    
-    # Store color theme in session state
-    if 'color_theme' not in st.session_state or color_theme:
-        st.session_state.color_theme = color_theme
-    
-    # Generate button
-    col1, col2, col3 = st.columns([1, 2, 1])
-    with col2:
-        generate_button = st.button("🔮 Generate Mandala")
-    
-    # Storage for generated image in session state
-    if 'generated_image' not in st.session_state:
-        st.session_state.generated_image = None
-    
-    # Generate mandala when button is clicked
-    if generate_button and inspiration_word and api_key:
-        with st.spinner("Creating your mandala... This might take up to 30 seconds"):
-            mandala_image = generate_mandala(inspiration_word, api_key, st.session_state.color_theme)
-            if mandala_image:
-                st.session_state.generated_image = mandala_image
-                st.session_state.inspiration_word = inspiration_word
-    
-    # Display generated mandala and download buttons
-    if st.session_state.generated_image:
-        st.success(f"✨ Your mandala inspired by '{st.session_state.inspiration_word}' is ready!")
-        
-        # Display image with a caption
-        st.image(
-            st.session_state.generated_image, 
-            caption=f"Mandala inspired by '{st.session_state.inspiration_word}'",
-            use_column_width=True
-        )
-        
-        # Create filename based on inspiration word and timestamp
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        base_filename = f"mandala_{st.session_state.inspiration_word}_{timestamp}"
-        
-        # Download options
-        st.write("### Download Options")
-        col1, col2 = st.columns(2)
-        
-        with col1:
-            st.markdown(
-                get_image_download_link(
-                    st.session_state.generated_image, 
-                    base_filename, 
-                    "📥 Download as PNG",
-                    "PNG"
-                ),
-                unsafe_allow_html=True
-            )
-        
-        with col2:
-            st.markdown(
-                get_image_download_link(
-                    st.session_state.generated_image, 
-                    base_filename, 
-                    "📥 Download as JPG",
-                    "JPG"
-                ),
-                unsafe_allow_html=True
-            )
-        
-        # Add some space and a note
-        st.write("")
-        st.info("💡 Generate as many mandalas as you like! Each one will be unique.")
-        
-        # Option to try another color theme for the same word
-        st.write("### Try another color theme?")
-        if st.button("Generate with a different color theme"):
-            st.session_state.color_theme = None
-            st.experimental_rerun()
+    # Generation button
+    generate_button = st.button("Generate Mandala", 
+                               help="Click to create your personalized mandala",
+                               use_container_width=True)
 
-if __name__ == "__main__":
-    main()
+# Main content area
+if generate_button:
+    if not api_key:
+        st.error("Please enter your OpenAI API key")
+    elif not inspiration_word:
+        st.error("Please enter an inspiration word")
+    else:
+        with st.spinner('Creating your magical mandala...'):
+            image, error = generate_mandala(api_key, inspiration_word, selected_theme)
+            
+            if error:
+                st.error(f"Error generating image: {error}")
+            elif image:
+                # Display the generated image
+                st.subheader(f"Your '{inspiration_word}' Mandala in {selected_theme}")
+                st.image(image, use_column_width=True)
+                
+                # Download link
+                st.markdown(get_image_download_link(image, 
+                                                  filename=f"{inspiration_word}_mandala.png", 
+                                                  text="⬇️ Download Your Mandala"), 
+                          unsafe_allow_html=True)
+                
+                # Display related information
+                st.info(f"This mandala was inspired by '{inspiration_word}' and uses the '{selected_theme}' color theme.")
+
+# App information section
+with st.expander("About this App"):
+    st.markdown("""
+    ### How to Use This App
+    1. Enter your OpenAI API key (requires a paid account with access to DALL-E 3)
+    2. Type a word or concept to inspire your mandala
+    3. Select a color theme from the dropdown
+    4. Click 'Generate Mandala' to create your art
+    5. Use the download button to save your mandala
+    
+    ### About Mandalas
+    Mandalas are geometric configurations of symbols with origins in religious practices. Today, they are also appreciated as art forms and tools for meditation and mindfulness.
+    
+    ### Technical Details
+    This app uses OpenAI's DALL-E 3 model to generate unique mandala artwork based on your inputs. The images are created in 1024x1024 resolution.
+    """)
+
+# Footer
+st.markdown("---")
+st.markdown("Created with ❤️ | Powered by Streamlit and OpenAI")
